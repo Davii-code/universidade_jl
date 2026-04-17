@@ -1,3 +1,10 @@
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+
 type IconProps = {
   className?: string;
 };
@@ -205,15 +212,30 @@ function FieldShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TextField({ placeholder }: { placeholder?: string }) {
+function TextField({ 
+  placeholder, 
+  id, 
+  register, 
+  error 
+}: { 
+  placeholder?: string; 
+  id?: string; 
+  register?: any; 
+  error?: string;
+}) {
   return (
-    <FieldShell>
-      <input
-        type="text"
-        placeholder={placeholder}
-        className="w-full border-0 bg-transparent p-0 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-      />
-    </FieldShell>
+    <div>
+      <FieldShell>
+        <input
+          id={id}
+          type="text"
+          placeholder={placeholder}
+          {...register}
+          className="w-full border-0 bg-transparent p-0 text-sm text-slate-900 outline-none placeholder:text-slate-400"
+        />
+      </FieldShell>
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+    </div>
   );
 }
 
@@ -301,232 +323,263 @@ function LogoMark() {
   );
 }
 
+const diplomaSchema = z.object({
+  nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
+  cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, "CPF inválido (use 000.000.000-00)"),
+  curso: z.string().min(2, "Selecione um curso válido"),
+});
+
+type DiplomaFormData = z.infer<typeof diplomaSchema>;
+
 export default function EmitirDiplomaPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<DiplomaFormData>({
+    resolver: zodResolver(diplomaSchema),
+    defaultValues: {
+      curso: "Engenharia de Software",
+    }
+  });
+
+  const onSubmit = async (data: DiplomaFormData) => {
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/emitir-diploma", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erro ao gerar diploma");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      setDownloadUrl(url);
+      
+      // Auto download
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `diploma_${data.nome.replace(/\s+/g, "_")}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error(error);
+      alert("Falha na emissão do diploma. Verifique o console.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f8fbff_0%,#eef3f9_46%,#e5ebf3_100%)] px-4 py-4 text-slate-900 sm:px-6 lg:px-8">
       <div className="relative mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1680px] flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.12)]">
-        <div className="border-b border-slate-200 bg-[#e8edf4] px-4 py-3 sm:px-5">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-[#ef5f57]" />
-              <span className="h-3 w-3 rounded-full bg-[#f6be4f]" />
-              <span className="h-3 w-3 rounded-full bg-[#53c16f]" />
-            </div>
-
-            <div className="hidden h-10 items-center gap-3 rounded-[1rem] bg-white/90 px-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200 md:flex md:w-[18rem] lg:w-[21rem]">
-              <span className="inline-flex items-center gap-2 text-slate-400">
-                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-                  <path
-                    d="M16.2 16.2 20 20"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
-                  <circle cx="11" cy="11" r="5.5" stroke="currentColor" strokeWidth="1.8" />
-                </svg>
-              </span>
-              <span className="truncate font-medium text-slate-700">Emitir Novo Diploma</span>
-            </div>
-
-            <div className="ml-auto flex items-center gap-3">
-              <div className="hidden items-center gap-2 rounded-[1rem] bg-white/90 px-4 py-2 text-xs text-slate-500 shadow-sm ring-1 ring-slate-200 xl:flex">
-                <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
-                localhost:3000/dashboard/emitir-diploma
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col">
+          {/* Header */}
+          <div className="border-b border-slate-200 bg-[#e8edf4] px-4 py-3 sm:px-5">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded-full bg-[#ef5f57]" />
+                <span className="h-3 w-3 rounded-full bg-[#f6be4f]" />
+                <span className="h-3 w-3 rounded-full bg-[#53c16f]" />
               </div>
-              <div className="hidden items-center gap-2 text-slate-400 lg:flex">
-                <span className="h-8 w-8 rounded-xl bg-white/90 shadow-sm ring-1 ring-slate-200" />
-                <span className="h-8 w-8 rounded-xl bg-white/90 shadow-sm ring-1 ring-slate-200" />
-                <span className="h-8 w-8 rounded-xl bg-white/90 shadow-sm ring-1 ring-slate-200" />
+
+              <div className="hidden h-10 items-center gap-3 rounded-[1rem] bg-white/90 px-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200 md:flex md:w-[18rem] lg:w-[21rem]">
+                <span className="inline-flex items-center gap-2 text-slate-400">
+                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                    <path
+                      d="M16.2 16.2 20 20"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    />
+                    <circle cx="11" cy="11" r="5.5" stroke="currentColor" strokeWidth="1.8" />
+                  </svg>
+                </span>
+                <span className="truncate font-medium text-slate-700">Emitir Novo Diploma</span>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <div className="border-b border-slate-200 bg-[#f6f8fc] px-6 py-4 sm:px-8">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <LogoMark />
-
-            <div className="flex items-center gap-3 self-start rounded-[1.2rem] border border-slate-200 bg-white px-3 py-2 shadow-sm xl:self-auto">
-              <button
-                type="button"
-                className="grid h-10 w-10 place-items-center rounded-xl bg-slate-50 text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-100"
-                aria-label="Notificações"
-              >
-                <BellIcon className="h-5 w-5" />
-              </button>
-              <div className="flex items-center gap-3 pl-1">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-sky-600 to-sky-400 text-sm font-semibold text-white shadow-sm">
-                  AS
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Admin Secretaria</p>
-                  <p className="text-xs text-slate-500">Usuário autenticado</p>
+              <div className="ml-auto flex items-center gap-3">
+                <div className="hidden items-center gap-2 rounded-[1rem] bg-white/90 px-4 py-2 text-xs text-slate-500 shadow-sm ring-1 ring-slate-200 xl:flex">
+                  <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
+                  localhost:3000/dashboard/emitir-diploma
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="relative flex flex-1 flex-col lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="border-b border-slate-200 bg-[#f7f9fc] px-4 py-5 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
-            <div className="space-y-2">
-              {navigationItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <a
-                    key={item.label}
-                    href="#"
-                    data-active={item.active}
-                    className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 data-[active=true]:bg-sky-100 data-[active=true]:text-sky-900"
-                  >
-                    <SidebarIconWrap>
-                      <Icon className="h-5 w-5" />
-                    </SidebarIconWrap>
-                    <span>{item.label}</span>
-                  </a>
-                );
-              })}
-            </div>
+          <div className="border-b border-slate-200 bg-[#f6f8fc] px-6 py-4 sm:px-8">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <LogoMark />
 
-            <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Fluxo Ativo</p>
-              <div className="mt-3 space-y-3 text-sm text-slate-600">
-                <div className="flex items-center justify-between">
-                  <span>Alunos aptos</span>
-                  <span className="font-semibold text-slate-900">148</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Diplomas pendentes</span>
-                  <span className="font-semibold text-slate-900">12</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Assinaturas válidas</span>
-                  <span className="font-semibold text-emerald-600">100%</span>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          <main className="bg-[#f4f7fb] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-            <div className="mx-auto max-w-6xl">
-              <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] lg:p-8">
-                <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="flex items-center gap-3 self-start rounded-[1.2rem] border border-slate-200 bg-white px-3 py-2 shadow-sm xl:self-auto">
+                <button
+                  type="button"
+                  className="grid h-10 w-10 place-items-center rounded-xl bg-slate-50 text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-100"
+                  aria-label="Notificações"
+                >
+                  <BellIcon className="h-5 w-5" />
+                </button>
+                <div className="flex items-center gap-3 pl-1">
+                  <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-sky-600 to-sky-400 text-sm font-semibold text-white shadow-sm">
+                    AS
+                  </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.34em] text-slate-400">Secretaria Acadêmica</p>
-                    <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Emitir Novo Diploma</h1>
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                      Configure os dados do egresso, revise a prévia institucional e conclua a emissão com assinatura digital ICP-Brasil.
-                    </p>
-                  </div>
-
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm xl:max-w-sm">
-                    <div className="flex items-center gap-3">
-                      <span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-100 text-emerald-600">
-                        <CheckIcon className="h-5 w-5" />
-                      </span>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">Certificado da Instituição Carregado</p>
-                        <p className="text-xs text-slate-500">Última verificação: há poucos segundos</p>
-                      </div>
-                    </div>
+                    <p className="text-sm font-semibold text-slate-900">Admin Secretaria</p>
+                    <p className="text-xs text-slate-500">Usuário autenticado</p>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
 
-                <div className="space-y-6 lg:space-y-8">
-                  <SectionCard
-                    title="Seção 1: Dados do Aluno"
-                    description="Identificação do estudante e vínculo acadêmico para emissão do diploma."
-                  >
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <FieldLabel>Nome Completo</FieldLabel>
-                        <TextField placeholder="" />
-                      </div>
-                      <div>
-                        <FieldLabel>CPF</FieldLabel>
-                        <TextField placeholder="" />
-                      </div>
+          <div className="relative flex flex-1 flex-col lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
+            <aside className="border-b border-slate-200 bg-[#f7f9fc] px-4 py-5 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
+              <div className="space-y-2">
+                {navigationItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <a
+                      key={item.label}
+                      href="#"
+                      data-active={item.active}
+                      className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 data-[active=true]:bg-sky-100 data-[active=true]:text-sky-900"
+                    >
+                      <SidebarIconWrap>
+                        <Icon className="h-5 w-5" />
+                      </SidebarIconWrap>
+                      <span>{item.label}</span>
+                    </a>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Fluxo Ativo</p>
+                <div className="mt-3 space-y-3 text-sm text-slate-600">
+                  <div className="flex items-center justify-between">
+                    <span>Alunos aptos</span>
+                    <span className="font-semibold text-slate-900">148</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Diplomas pendentes</span>
+                    <span className="font-semibold text-slate-900">12</span>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <main className="bg-[#f4f7fb] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+              <div className="mx-auto max-w-6xl">
+                <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] lg:p-8">
+                  <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.34em] text-slate-400">Secretaria Acadêmica</p>
+                      <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Emitir Novo Diploma</h1>
+                      <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+                        Configure os dados do egresso, revise a prévia institucional e conclua a emissão com assinatura digital.
+                      </p>
                     </div>
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
-                      <div>
-                        <FieldLabel>Registro Acadêmico (RA)</FieldLabel>
-                        <TextField placeholder="" />
-                      </div>
-                      <div>
-                        <FieldLabel>Curso</FieldLabel>
-                        <SelectField value="Graduação" />
-                      </div>
-                    </div>
-                  </SectionCard>
 
-                  <SectionCard
-                    title="Seção 2: Dados do Diploma"
-                    description="Datas oficiais e tipo de diploma que serão gravados no documento final."
-                  >
-                    <div className="grid gap-4 lg:grid-cols-3">
-                      <div>
-                        <FieldLabel>Data de Conclusão</FieldLabel>
-                        <DateField />
-                      </div>
-                      <div>
-                        <FieldLabel>Data de Colação de Grau</FieldLabel>
-                        <DateField />
-                      </div>
-                      <div>
-                        <FieldLabel>Tipo de Diploma</FieldLabel>
-                        <SelectField value="Graduação, Pós-Graduação" />
-                      </div>
-                    </div>
-                  </SectionCard>
-
-                  <SectionCard
-                    title="Seção 3: Visualização Prévia"
-                    description="Prévia gráfica do documento com brasão, margens e composição tipográfica."
-                  >
-                    <DiplomaPreview />
-                  </SectionCard>
-
-                  <SectionCard
-                    title="Seção 4: Assinatura Digital"
-                    description="Validação final com certificado institucional antes da geração oficial."
-                  >
-                    <div className="space-y-4">
-                      <div className="inline-flex items-center gap-3 rounded-[1.35rem] border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-700 shadow-sm">
+                    <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm xl:max-w-sm">
+                      <div className="flex items-center gap-3">
                         <span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-100 text-emerald-600">
                           <CheckIcon className="h-5 w-5" />
                         </span>
-                        <span className="font-medium">Certificado da Instituição Carregado</span>
-                      </div>
-
-                      <p className="max-w-3xl text-sm leading-6 text-slate-500">
-                        A emissão utilizará o certificado digital ICP-Brasil da Universidade JL.
-                      </p>
-
-                      <div className="grid gap-3 pt-2 sm:grid-cols-2">
-                        <button
-                          type="button"
-                          className="inline-flex h-12 items-center justify-center rounded-2xl border border-sky-600 bg-white px-5 text-sm font-semibold text-sky-700 shadow-sm transition hover:bg-sky-50"
-                        >
-                          Salvar Rascunho
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex h-12 items-center justify-center rounded-2xl border border-sky-700 bg-sky-700 px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(29,78,216,0.22)] transition hover:bg-sky-800"
-                        >
-                          Gerar e Assinar Diploma
-                        </button>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">Certificado Carregado</p>
+                          <p className="text-xs text-slate-500">Status: Ativo (.p12)</p>
+                        </div>
                       </div>
                     </div>
-                  </SectionCard>
-                </div>
-              </section>
-            </div>
-          </main>
+                  </div>
 
-          <div className="pointer-events-none absolute right-4 top-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 shadow-[0_12px_30px_rgba(15,23,42,0.12)] sm:right-6 sm:top-5">
-            Verificando conexão com AC
+                  <div className="space-y-6 lg:space-y-8">
+                    <SectionCard
+                      title="Seção 1: Dados do Aluno"
+                      description="Identificação do estudante e vínculo acadêmico."
+                    >
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <FieldLabel>Nome Completo</FieldLabel>
+                          <TextField 
+                            placeholder="Nome como consta no RG" 
+                            id="nome"
+                            register={register("nome")}
+                            error={errors.nome?.message}
+                          />
+                        </div>
+                        <div>
+                          <FieldLabel>CPF</FieldLabel>
+                          <TextField 
+                            placeholder="000.000.000-00" 
+                            id="cpf"
+                            register={register("cpf")}
+                            error={errors.cpf?.message}
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <div>
+                          <FieldLabel>Curso</FieldLabel>
+                          <TextField 
+                            placeholder="Ex: Engenharia de Software" 
+                            id="curso"
+                            register={register("curso")}
+                            error={errors.curso?.message}
+                          />
+                        </div>
+                      </div>
+                    </SectionCard>
+
+                    <SectionCard
+                      title="Seção 2: Visualização Prévia"
+                      description="Prévia gráfica aproximada do documento."
+                    >
+                      <DiplomaPreview />
+                    </SectionCard>
+
+                    <SectionCard
+                      title="Seção 3: Assinatura Digital"
+                      description="Conclusão com certificado institucional."
+                    >
+                      <div className="space-y-4">
+                        <p className="max-w-3xl text-sm leading-6 text-slate-500">
+                          Ao clicar em gerar, o sistema irá criar o PDF, aplicar o padrão PAdES de assinatura digital e disponibilizar o arquivo assinado.
+                        </p>
+
+                        <div className="grid gap-3 pt-2 sm:grid-cols-2">
+                          <button
+                            type="button"
+                            onClick={() => reset()}
+                            className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
+                          >
+                            Limpar Campos
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className={`inline-flex h-12 items-center justify-center rounded-2xl border border-sky-700 bg-sky-700 px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(29,78,216,0.22)] transition hover:bg-sky-800 disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {isSubmitting ? "Processando e Assinando..." : "Gerar e Assinar Diploma"}
+                          </button>
+                        </div>
+                      </div>
+                    </SectionCard>
+                  </div>
+                </section>
+              </div>
+            </main>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
