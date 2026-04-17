@@ -216,12 +216,14 @@ function TextField({
   placeholder, 
   id, 
   register, 
-  error 
+  error,
+  onChange
 }: { 
   placeholder?: string; 
   id?: string; 
   register?: any; 
   error?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
     <div>
@@ -231,6 +233,10 @@ function TextField({
           type="text"
           placeholder={placeholder}
           {...register}
+          onChange={(e) => {
+            if (onChange) onChange(e);
+            if (register?.onChange) register.onChange(e);
+          }}
           className="w-full border-0 bg-transparent p-0 text-sm text-slate-900 outline-none placeholder:text-slate-400"
         />
       </FieldShell>
@@ -331,6 +337,15 @@ const diplomaSchema = z.object({
 
 type DiplomaFormData = z.infer<typeof diplomaSchema>;
 
+const maskCPF = (value: string) => {
+  return value
+    .replace(/\D/g, "")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})/, "$1-$2")
+    .replace(/(-\d{2})\d+?$/, "$1");
+};
+
 export default function EmitirDiplomaPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -340,12 +355,18 @@ export default function EmitirDiplomaPage() {
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
   } = useForm<DiplomaFormData>({
     resolver: zodResolver(diplomaSchema),
     defaultValues: {
       curso: "Engenharia de Software",
     }
   });
+
+  const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const maskedValue = maskCPF(e.target.value);
+    setValue("cpf", maskedValue);
+  };
 
   const onSubmit = async (data: DiplomaFormData) => {
     setIsSubmitting(true);
@@ -523,6 +544,7 @@ export default function EmitirDiplomaPage() {
                             placeholder="000.000.000-00" 
                             id="cpf"
                             register={register("cpf")}
+                            onChange={handleCPFChange}
                             error={errors.cpf?.message}
                           />
                         </div>
